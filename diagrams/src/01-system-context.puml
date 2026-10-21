@@ -1,0 +1,37 @@
+@startuml system_context_diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam roundcorner 10
+skinparam ArrowColor #1B4F72
+skinparam ArrowThickness 1.5
+
+actor "Врач ЛПУ\n(Doctor)" as Doctor #E8F4F8
+actor "Пациент\n(Patient)" as Patient #E8F8F5
+actor "Фармацевт\n(Pharmacist)" as Pharmacist #FEF9E7
+actor "Администратор / Минздрав РК\n(MoH Regulator)" as Admin #FADBD8
+
+rectangle "Централизованная платформа электронных рецептов (CEPP)\n[Core System]" as CoreSystem #D4EFDF {
+  component "Веб-порталы, Мобильные API\nи Сервисы платформы" as CEPP #A9DFBF
+}
+
+rectangle "Внешние государственные и медицинские системы РК\n(пунктир — future, вне MVP)" as ExternalSystems #EAECEE {
+  rectangle "НУЦ РК & NCALayer\n(ЭЦП ГОСТ РК, OCSP)" as NCALayer #D6EAF8
+  rectangle "Госреестр ЛС & КНФ\n(Справочник медикаментов РК)" as KNF #D6EAF8
+  rectangle "eGov Mobile & SMS Шлюз 1414\n(Уведомления пациентов)" as eGov #D6EAF8
+  rectangle "МИС Клиник\n(ДамуМед, КМИС и др.)" as MIS #FCF3CF
+  rectangle "Аптечные POS / 1C Системы\n(Кассовые узлы аптек)" as POS #FCF3CF
+}
+
+Doctor --> CEPP : 1. Выписка и подписание рецепта ЭЦП
+Patient --> CEPP : 2. Просмотр назначений, получение QR
+Pharmacist --> CEPP : 3. Сканирование QR, отпуск с ЭЦП
+Admin --> CEPP : 4. Модерация организаций, аудит
+
+CEPP <--> NCALayer : Валидация сертификатов и подписей CMS
+CEPP ..> KNF : (future) Синхронизация МНН и торговых марок
+CEPP ..> eGov : (future) Отправка PUSH/SMS уведомлений (1414)
+MIS ..> CEPP : (future) Интеграция выписки рецептов (REST API)
+POS ..> CEPP : (future) Погашение рецептов из аптек (POS API)
+@enduml

@@ -1,0 +1,74 @@
+@startuml component_diagram
+!theme plain
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam componentStyle uml2
+skinparam ArrowColor #2C3E50
+
+package "Клиентский уровень (Presentation Layer)" {
+  [Doctor Web App (React/SPA)] as DocUI
+  [Pharmacist Web App] as PharmUI
+  [Patient Mobile / Web App] as PatUI
+}
+
+package "Шлюз и безопасность (Gateway Layer)" {
+  [Caddy Reverse Proxy (TLS)] as Gateway
+  [Rate Limiter] as WAF
+}
+
+package "Ядро бэкенда (Core Application Services)" {
+  [Identity & Access Management (IAM)] as AuthSvc
+  [Prescription Management Service] as PrescSvc
+  [Clinical Decision Support (CDS)] as CDSSvc
+  [PKI & Digital Signature Service] as PKISvc
+  [Dynamic QR Token Service] as QRSvc
+  [Dispensing Management Service] as DispSvc
+  [Drug & Medical Catalog Service] as CatSvc
+  [Tamper-Evident Audit Service] as AuditSvc
+  [Notification Worker] as NotifySvc
+}
+
+package "Уровень хранения (Persistence Layer)" {
+  database "PostgreSQL 16\n(Relational DB)" as Postgres
+}
+
+cloud "Внешние сервисы РК" {
+  [NCANode / OCSP НУЦ РК] as ExtNCALayer
+  [SMS Gateway (simulated)] as ExtSMS
+}
+
+DocUI --> Gateway
+PharmUI --> Gateway
+PatUI --> Gateway
+
+Gateway --> WAF
+WAF --> AuthSvc
+WAF --> PrescSvc
+WAF --> DispSvc
+WAF --> QRSvc
+
+PrescSvc --> CDSSvc
+PrescSvc --> PKISvc
+PrescSvc --> CatSvc
+DispSvc --> PKISvc
+DispSvc --> QRSvc
+DispSvc --> CatSvc
+
+QRSvc --> Postgres : qr_tokens (nonce, TTL)
+
+NotifySvc --> Postgres : notifications
+NotifySvc --> ExtSMS
+
+PKISvc <--> ExtNCALayer : GOST / OCSP verify
+
+AuthSvc --> AuditSvc
+PrescSvc --> AuditSvc
+DispSvc --> AuditSvc
+AuditSvc --> Postgres : Append-only Hash Chain
+
+AuthSvc --> Postgres
+PrescSvc --> Postgres
+DispSvc --> Postgres
+CDSSvc --> Postgres
+CatSvc --> Postgres
+@enduml

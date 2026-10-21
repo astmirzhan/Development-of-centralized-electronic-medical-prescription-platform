@@ -1,0 +1,396 @@
+@startuml erd
+scale max 4000 width
+!theme plain
+hide circle
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+' ==========================================
+' 0. ПЕРЕЧИСЛЕНИЯ (ENUMS)
+' ==========================================
+
+enum org_type_enum {
+  clinic
+  pharmacy
+}
+
+enum prescription_status_enum {
+  draft
+  active
+  partially_dispensed
+  fully_dispensed
+  expired
+  cancelled
+}
+
+enum prescription_item_status_enum {
+  pending
+  partially_dispensed
+  dispensed
+  cancelled
+}
+
+enum ddi_severity_enum {
+  minor
+  moderate
+  critical
+}
+
+enum signature_entity_enum {
+  prescription
+  dispensing
+  cancellation
+}
+
+enum notification_type_enum {
+  sms
+  push
+  email
+}
+
+' ==========================================
+' 1. АУТЕНТИФИКАЦИЯ И РОЛИ (USERS & SECURITY)
+' ==========================================
+package "1. Users & Security" {
+  entity "users" as users {
+    * id : UUID <<PK>>
+    --
+    * iin : VARCHAR(12) <<UQ>>
+    * phone : VARCHAR(20) <<UQ>>
+    email : VARCHAR(255) <<UQ>>
+    password_hash : VARCHAR(255)
+    * first_name : VARCHAR(100)
+    * last_name : VARCHAR(100)
+    middle_name : VARCHAR(100)
+    * is_active : BOOLEAN = true
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "roles" as roles {
+    * id : SERIAL <<PK>>
+    --
+    * name : VARCHAR(50) <<UQ>>
+    description : TEXT
+  }
+
+  entity "user_roles" as user_roles {
+    * user_id : UUID <<PK, FK>>
+    * role_id : INT <<PK, FK>>
+    --
+    * is_verified : BOOLEAN = false
+    verified_at : TIMESTAMP
+    verified_by : UUID <<FK>>
+  }
+
+  entity "refresh_tokens" as refresh_tokens {
+    * id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * token_hash : VARCHAR(255)
+    device_info : VARCHAR(255)
+    ip_address : VARCHAR(45)
+    * expires_at : TIMESTAMP
+    revoked_at : TIMESTAMP
+    * created_at : TIMESTAMP
+  }
+}
+
+' ==========================================
+' 2. ОРГАНИЗАЦИИ И ПРОФИЛИ
+' ==========================================
+package "2. Organizations & Profiles" {
+  entity "organizations" as organizations {
+    * id : UUID <<PK>>
+    --
+    * bin : VARCHAR(12) <<UQ>>
+    * name : VARCHAR(255)
+    * org_type : org_type_enum
+    * address : TEXT
+    phone : VARCHAR(20)
+    license_number : VARCHAR(100)
+    * is_verified : BOOLEAN = false
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "clinic_details" as clinic_details {
+    * organization_id : UUID <<PK, FK>>
+    --
+    accreditation_category : VARCHAR(100)
+    accreditation_valid_until : DATE
+  }
+
+  entity "pharmacy_details" as pharmacy_details {
+    * organization_id : UUID <<PK, FK>>
+    --
+    * has_narcotics_license : BOOLEAN = false
+    narcotics_license_number : VARCHAR(100)
+    narcotics_license_valid_until : DATE
+  }
+
+  entity "doctor_profiles" as doctor_profiles {
+    * user_id : UUID <<PK, FK>>
+    --
+    * license_number : VARCHAR(100) <<UQ>>
+    * specialization : VARCHAR(150)
+    eds_cert_dn : VARCHAR(500)
+    * is_verified : BOOLEAN = false
+  }
+
+  entity "doctor_clinics" as doctor_clinics {
+    * doctor_id : UUID <<PK, FK>>
+    * clinic_id : UUID <<PK, FK>>
+    --
+    * is_primary : BOOLEAN = false
+    * created_at : TIMESTAMP
+  }
+
+  entity "pharmacist_profiles" as pharmacist_profiles {
+    * user_id : UUID <<PK, FK>>
+    --
+    * pharmacy_id : UUID <<FK>>
+    * specialist_cert_number : VARCHAR(100)
+    * is_verified : BOOLEAN = false
+  }
+
+  entity "patient_profiles" as patient_profiles {
+    * user_id : UUID <<PK, FK>>
+    --
+    * date_of_birth : DATE
+    * gender : VARCHAR(20)
+    blood_group : VARCHAR(10)
+    emergency_contact : VARCHAR(100)
+  }
+}
+
+' ==========================================
+' 3. СПРАВОЧНИКИ ЛС И БЕЗОПАСНОСТЬ
+' ==========================================
+package "3. Medicines & Clinical Safety" {
+  entity "medicines" as medicines {
+    * id : UUID <<PK>>
+    --
+    * inn_name_ru : VARCHAR(255)
+    * inn_name_kz : VARCHAR(255)
+    * inn_name_en : VARCHAR(255)
+    atc_code : VARCHAR(20)
+    * is_prescription_required : BOOLEAN = true
+    * is_antibiotic : BOOLEAN = false
+    * is_narcotic : BOOLEAN = false
+    * created_at : TIMESTAMP
+  }
+
+  entity "medicine_forms" as medicine_forms {
+    * id : UUID <<PK>>
+    --
+    * medicine_id : UUID <<FK>>
+    * form_type : VARCHAR(100)
+    * dosage_value : DECIMAL(10,2)
+    * dosage_unit : VARCHAR(50)
+    * package_quantity : INT
+  }
+
+  entity "medicine_brands" as medicine_brands {
+    * id : UUID <<PK>>
+    --
+    * medicine_form_id : UUID <<FK>>
+    * trade_name : VARCHAR(255)
+    * manufacturer : VARCHAR(255)
+    * country : VARCHAR(100)
+    * reg_number : VARCHAR(100)
+  }
+
+  entity "icd10_codes" as icd10_codes {
+    * id : SERIAL <<PK>>
+    --
+    * code : VARCHAR(10) <<UQ>>
+    * name_ru : VARCHAR(500)
+    * name_kz : VARCHAR(500)
+  }
+
+  entity "patient_allergies" as patient_allergies {
+    * id : UUID <<PK>>
+    --
+    * patient_id : UUID <<FK>>
+    * medicine_id : UUID <<FK>>
+    reaction_description : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "drug_interactions" as drug_interactions {
+    * id : UUID <<PK>>
+    --
+    * medicine_a_id : UUID <<FK>>
+    * medicine_b_id : UUID <<FK>>
+    * severity_level : ddi_severity_enum
+    * description : TEXT
+  }
+}
+
+' ==========================================
+' 4. РЕЦЕПТЫ И QR
+' ==========================================
+package "4. Prescriptions & QR" {
+  entity "prescriptions" as prescriptions {
+    * id : UUID <<PK>>
+    --
+    * prescription_number : VARCHAR(50) <<UQ>>
+    * doctor_id : UUID <<FK>>
+    * clinic_id : UUID <<FK>>
+    * patient_id : UUID <<FK>>
+    * diagnosis_id : INT <<FK>>
+    * status : prescription_status_enum
+    * valid_until : TIMESTAMP
+    notes : TEXT
+    cancellation_reason : TEXT
+    cancelled_by : UUID <<FK>>
+    cancelled_at : TIMESTAMP
+    * created_at : TIMESTAMP
+    * updated_at : TIMESTAMP
+  }
+
+  entity "prescription_items" as prescription_items {
+    * id : UUID <<PK>>
+    --
+    * prescription_id : UUID <<FK>>
+    * medicine_form_id : UUID <<FK>>
+    * dosage_value : DECIMAL(10,2)
+    * dosage_unit : VARCHAR(50)
+    * frequency : VARCHAR(100)
+    * duration_days : INT
+    * quantity_prescribed : INT
+    * quantity_dispensed : INT = 0
+    * status : prescription_item_status_enum
+    instruction_text : TEXT
+  }
+
+  entity "qr_tokens" as qr_tokens {
+    * id : UUID <<PK>>
+    --
+    * prescription_item_id : UUID <<FK>>
+    * token_hash : VARCHAR(255) <<UQ>>
+    * nonce : VARCHAR(64)
+    * expires_at : TIMESTAMP
+    * is_consumed : BOOLEAN = false
+    consumed_by_user_id : UUID <<FK>>
+    consumed_at : TIMESTAMP
+    * created_at : TIMESTAMP
+  }
+}
+
+' ==========================================
+' 5. ВЫДАЧА И ЭЦП
+' ==========================================
+package "5. Dispensing & Signatures" {
+  entity "dispensing_events" as dispensing_events {
+    * id : UUID <<PK>>
+    --
+    * prescription_item_id : UUID <<FK>>
+    * pharmacist_id : UUID <<FK>>
+    * pharmacy_id : UUID <<FK>>
+    * medicine_brand_id : UUID <<FK>>
+    * quantity_dispensed : INT
+    * dispensed_at : TIMESTAMP
+    notes : TEXT
+    signature_id : UUID <<FK>>
+  }
+
+  entity "signatures" as signatures {
+    * id : UUID <<PK>>
+    --
+    * entity_type : signature_entity_enum
+    * entity_id : UUID
+    * signer_user_id : UUID <<FK>>
+    * signer_iin : VARCHAR(12)
+    * cert_serial_number : VARCHAR(100)
+    * raw_signature : TEXT
+    * signature_hash : VARCHAR(64)
+    * signed_at : TIMESTAMP
+    * ocsp_status : VARCHAR(50)
+    * verification_status : VARCHAR(50)
+  }
+}
+
+' ==========================================
+' 6. АУДИТ И УВЕДОМЛЕНИЯ
+' ==========================================
+package "6. Audit & Notifications" {
+  entity "audit_logs" as audit_logs {
+    * id : BIGSERIAL <<PK>>
+    --
+    prev_record_hash : VARCHAR(64)
+    * record_hash : VARCHAR(64)
+    actor_id : UUID <<FK>>
+    * action : VARCHAR(100)
+    * entity_type : VARCHAR(100)
+    * entity_id : UUID
+    payload : JSONB
+    ip_address : VARCHAR(45)
+    user_agent : TEXT
+    * created_at : TIMESTAMP
+  }
+
+  entity "notifications" as notifications {
+    * id : UUID <<PK>>
+    --
+    * user_id : UUID <<FK>>
+    * type : notification_type_enum
+    * recipient : VARCHAR(255)
+    * message : TEXT
+    * status : VARCHAR(50)
+    sent_at : TIMESTAMP
+  }
+}
+
+' ==========================================
+' СВЯЗИ (RELATIONSHIPS)
+' ==========================================
+
+users ||--o{ user_roles : "user_id"
+roles ||--o{ user_roles : "role_id"
+users ||--o{ user_roles : "verified_by"
+users ||--o{ refresh_tokens : "user_id"
+
+users ||--o| doctor_profiles : "1:1 user_id"
+users ||--o| pharmacist_profiles : "1:1 user_id"
+users ||--o| patient_profiles : "1:1 user_id"
+
+organizations ||--o| clinic_details : "1:1 organization_id"
+organizations ||--o| pharmacy_details : "1:1 organization_id"
+
+doctor_profiles ||--o{ doctor_clinics : "doctor_id"
+organizations ||--o{ doctor_clinics : "clinic_id"
+organizations ||--o{ pharmacist_profiles : "pharmacy_id"
+
+medicines ||--o{ medicine_forms : "medicine_id"
+medicine_forms ||--o{ medicine_brands : "medicine_form_id"
+patient_profiles ||--o{ patient_allergies : "patient_id"
+medicines ||--o{ patient_allergies : "medicine_id"
+medicines ||--o{ drug_interactions : "medicine_a_id"
+medicines ||--o{ drug_interactions : "medicine_b_id"
+
+doctor_profiles ||--o{ prescriptions : "doctor_id"
+organizations ||--o{ prescriptions : "clinic_id"
+patient_profiles ||--o{ prescriptions : "patient_id"
+icd10_codes ||--o{ prescriptions : "diagnosis_id"
+users ||--o{ prescriptions : "cancelled_by"
+
+prescriptions ||--|{ prescription_items : "prescription_id"
+medicine_forms ||--o{ prescription_items : "medicine_form_id"
+prescription_items ||--o{ qr_tokens : "prescription_item_id"
+users ||--o{ qr_tokens : "consumed_by_user_id"
+
+prescription_items ||--o{ dispensing_events : "prescription_item_id"
+pharmacist_profiles ||--o{ dispensing_events : "pharmacist_id"
+organizations ||--o{ dispensing_events : "pharmacy_id"
+medicine_brands ||--o{ dispensing_events : "medicine_brand_id"
+signatures ||--o| dispensing_events : "signature_id"
+users ||--o{ signatures : "signer_user_id"
+
+users ||--o{ audit_logs : "actor_id"
+users ||--o{ notifications : "user_id"
+
+@enduml
