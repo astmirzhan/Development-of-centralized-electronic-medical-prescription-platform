@@ -1,0 +1,53 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+vendor/
+
+# Node / Next.js / Expo
+node_modules/
+.next/
+out/
+dist/
+build/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Mobile builds
+*.apk
+*.aab
+*.ipa
+
+# Test & tool output
+playwright-report/
+test-results/
+k6-results/
+*.log
+
+# Databases / dumps
+*.sqlite
+*.dump
+backups/
