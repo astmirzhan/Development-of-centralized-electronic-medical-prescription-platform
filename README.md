@@ -41,7 +41,8 @@ Details and evidence: [Proposal](docs/01-project-proposal.md) · [Evidence of re
 | **Mysyrgaliyev Mirzhan** | [`@astmirzhan`](https://github.com/astmirzhan) | Team lead, backend developer, repository owner | Repository administration, project management, system architecture, database design, Go API core, authentication and EDS integration, prescription module, CI/CD and VPS deployment |
 | **Muratbayuly Abylaykhan** | [`@xJam-byte`](https://github.com/xJam-byte) | Backend and mobile developer | Dispensing, QR token, audit, and admin modules; OpenAPI specification; React Native patient app |
 | **Ibragim Nurkasym** | [`@spohgeboq`](https://github.com/spohgeboq) | Frontend developer | Next.js portals for doctors, pharmacists, and administrators; NCALayer integration in the browser; QR scanning; UI prototype |
-| **Хаймульдин Асқар Ғазизұлы** | Supervisor | Reviews key deliverables at checkpoints |
+
+**Supervisor:** Хаймульдин Асқар Ғазизұлы — reviews key deliverables at checkpoints.
 
 Full allocation, milestones, and risks: [Project management](docs/10-project-management-and-risks.md)
 
