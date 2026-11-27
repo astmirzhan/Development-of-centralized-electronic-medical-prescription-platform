@@ -47,6 +47,16 @@ func TestCDSIntegrationAndPerformancePG16(t *testing.T) {
 
 	svc := cds.NewService(cds.NewPGRepository(pool), nil)
 
+	// Warm pgxpool connections (matching production NewPool MinConns warm state)
+	// before asserting <150ms CDS evaluation latency.
+	if _, err := svc.Evaluate(ctx, cds.CheckRequest{
+		PatientID:       seed.ChildUserID,
+		DiagnosisID:     diagViralID,
+		MedicineFormIDs: []uuid.UUID{paracetamolForm},
+	}); err != nil {
+		t.Fatalf("warmup Evaluate: %v", err)
+	}
+
 	// 1. Seeded Amoxicillin allergy for Sultanov Y.M. (981105303419) blocks issuance.
 	allergyRes, err := svc.Evaluate(ctx, cds.CheckRequest{
 		PatientID:       seed.PatientUserID,

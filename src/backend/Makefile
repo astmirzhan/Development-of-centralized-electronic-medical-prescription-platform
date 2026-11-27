@@ -6,7 +6,7 @@ POSTGRES_PASSWORD ?= change-me
 
 DB_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable
 
-.PHONY: run build seed migrate-up migrate-down test test-race coverage lint
+.PHONY: run build seed migrate-up migrate-down test test-race coverage coverage-check lint
 
 run:
 	go run ./cmd/api
@@ -33,6 +33,9 @@ test-race:
 coverage:
 	go test -race -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out | grep -E "internal/(cds|pharmacy|pki|qr)|total:"
+
+coverage-check:
+	go test -race -cover ./internal/cds ./internal/pharmacy ./internal/pki ./internal/qr
 
 lint:
 	test -z "$$(gofmt -l .)"
