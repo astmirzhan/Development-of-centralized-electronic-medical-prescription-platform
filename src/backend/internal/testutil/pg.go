@@ -3,6 +3,8 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"os"
@@ -65,7 +67,9 @@ func SetupMigratedDB(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("ping admin postgres: %v", err)
 	}
 
-	dbName := fmt.Sprintf("erx_it_%d_%d", time.Now().UnixNano(), dbCounter.Add(1))
+	randBuf := make([]byte, 4)
+	_, _ = rand.Read(randBuf)
+	dbName := fmt.Sprintf("erx_it_%d_%d_%s", os.Getpid(), dbCounter.Add(1), hex.EncodeToString(randBuf))
 	if _, err := adminPool.Exec(ctx, "CREATE DATABASE "+dbName); err != nil {
 		adminPool.Close()
 		t.Fatalf("create isolated test database %s: %v", dbName, err)

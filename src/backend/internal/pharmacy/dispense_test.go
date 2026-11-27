@@ -305,3 +305,89 @@ func TestDispenseValidationAndErrorMappingsPG16(t *testing.T) {
 		t.Fatalf("expected 403, got %d", resp403.StatusCode)
 	}
 }
+
+func TestDispenseAdditionalBranchesPG16(t *testing.T) {
+	pool := testutil.SetupSeededDB(t)
+	ctx := context.Background()
+
+	rxID, itemID, brandID := setupActivePrescriptionItem(t, pool, 10)
+	pharmacist := auth.ActorContext{
+		UserID: seed.PharmacistUserID,
+		IIN:    "920721402851",
+		Role:   auth.RolePharmacist,
+	}
+	srv, qrSvc, pharmSvc := newTestPharmacyServer(t, pool, pharmacist)
+	qrRepo := qr.NewPGRepository(pool)
+
+	// 1. Missing CMSSignature -> ErrInvalidDispenseRequest (400)
+	issued, err := qrSvc.IssueToken(ctx, itemID, seed.PatientUserID)
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+	if _, err := pharmSvc.Dispense(ctx, pharmacist, pharmacy.DispenseRequest{
+		QRToken:         issued.Token,
+		MedicineBrandID: brandID,
+		Quantity:        1,
+	}); !errors.Is(err, pharmacy.ErrInvalidDispenseRequest) {
+		t.Fatalf("expected ErrInvalidDispenseRequest for empty signature, got %v", err)
+	}
+
+	// 2. Malformed JSON body -> 400
+	respBadJSON, err := http.Post(srv.URL+"/api/v1/dispensing", "application/json", bytes.NewBufferString(`{invalid`))
+	if err != nil {
+		t.Fatalf("HTTP POST bad JSON: %v", err)
+	}
+	_ = respBadJSON.Body.Close()
+	if respBadJSON.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for malformed JSON, got %d", respBadJSON.StatusCode)
+	}
+
+	// 3. Unknown pharmacist profile -> ErrForbiddenPharmacist
+	unknownPharm := auth.ActorContext{UserID: uuid.New(), IIN: "999999999999", Role: auth.RolePharmacist}
+	if _, err := pharmSvc.Dispense(ctx, unknownPharm, signDispenseReq(t, issued.Token, unknownPharm.IIN, brandID, 1)); !errors.Is(err, pharmacy.ErrForbiddenPharmacist) {
+		t.Fatalf("expected ErrForbiddenPharmacist for unknown profile, got %v", err)
+	}
+
+	// 4. Non-existent medicine brand UUID -> ErrBrandMismatch
+	if _, err := pharmSvc.Dispense(ctx, pharmacist, signDispenseReq(t, issued.Token, pharmacist.IIN, uuid.New(), 1)); !errors.Is(err, pharmacy.ErrBrandMismatch) {
+		t.Fatalf("expected ErrBrandMismatch for unknown brand, got %v", err)
+	}
+
+	// 5. Dispense with non-empty Notes succeeds cleanly
+	reqWithNotes := signDispenseReq(t, issued.Token, pharmacist.IIN, brandID, 2)
+	reqWithNotes.Notes = "Patient counseled on dosage"
+	res, err := pharmSvc.Dispense(ctx, pharmacist, reqWithNotes)
+	if err != nil {
+		t.Fatalf("dispense with notes failed: %v", err)
+	}
+	if res.RemainingQuantity != 8 {
+		t.Fatalf("expected remaining 8, got %d", res.RemainingQuantity)
+	}
+
+	// 6. Cancelled prescription -> ErrPrescriptionNotActive
+	issued2, err := qrSvc.IssueToken(ctx, itemID, seed.PatientUserID)
+	if err != nil {
+		t.Fatalf("IssueToken #2: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE prescriptions SET status = 'cancelled' WHERE id = $1`, rxID); err != nil {
+		t.Fatalf("cancel prescription: %v", err)
+	}
+	if _, err := pharmSvc.Dispense(ctx, pharmacist, signDispenseReq(t, issued2.Token, pharmacist.IIN, brandID, 1)); !errors.Is(err, pharmacy.ErrPrescriptionNotActive) {
+		t.Fatalf("expected ErrPrescriptionNotActive for cancelled prescription, got %v", err)
+	}
+
+	// 7. Already dispensed item -> ErrItemAlreadyDispensed
+	raw3 := "erx_already_dispensed_item_token"
+	if _, err := qrRepo.InsertToken(ctx, itemID, qr.HashToken(raw3), "nonce3", time.Now().UTC().Add(time.Minute)); err != nil {
+		t.Fatalf("insert token #3: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE prescriptions SET status = 'active' WHERE id = $1`, rxID); err != nil {
+		t.Fatalf("reactivate prescription: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE prescription_items SET status = 'dispensed' WHERE id = $1`, itemID); err != nil {
+		t.Fatalf("mark item dispensed: %v", err)
+	}
+	if _, err := pharmSvc.Dispense(ctx, pharmacist, signDispenseReq(t, raw3, pharmacist.IIN, brandID, 1)); !errors.Is(err, pharmacy.ErrItemAlreadyDispensed) {
+		t.Fatalf("expected ErrItemAlreadyDispensed, got %v", err)
+	}
+}
