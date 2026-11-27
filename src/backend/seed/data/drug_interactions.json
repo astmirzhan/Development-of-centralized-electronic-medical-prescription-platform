@@ -1,0 +1,72 @@
+[
+  {
+    "id": "40000000-0000-0000-0000-000000000001",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000004",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000005",
+    "severity_level": "critical",
+    "description": "Warfarin + Aspirin markedly increases risk of severe gastrointestinal and intracranial hemorrhage."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000002",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000004",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000006",
+    "severity_level": "critical",
+    "description": "Warfarin + Ibuprofen significantly increases bleeding risk due to platelet inhibition and GI mucosal damage."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000003",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000004",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000011",
+    "severity_level": "critical",
+    "description": "Dual antithrombotic therapy (Warfarin + Clopidogrel) carries critical risk of major bleeding."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000004",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000003",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000006",
+    "severity_level": "moderate",
+    "description": "Ciprofloxacin + Ibuprofen may increase CNS stimulation and seizure risk."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000005",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000008",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000006",
+    "severity_level": "moderate",
+    "description": "Lisinopril + Ibuprofen may reduce antihypertensive efficacy and impair renal function."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000006",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000009",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000011",
+    "severity_level": "moderate",
+    "description": "Omeprazole inhibits CYP2C19 activation of Clopidogrel, reducing antiplatelet efficacy."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000007",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000002",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000004",
+    "severity_level": "moderate",
+    "description": "Azithromycin may potentiate anticoagulant effect of Warfarin; monitor INR closely."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000008",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000003",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000007",
+    "severity_level": "moderate",
+    "description": "Ciprofloxacin + Metformin can alter blood glucose control (dysglycemia)."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000009",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000001",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000006",
+    "severity_level": "minor",
+    "description": "Minor interaction: monitor gastrointestinal tolerance when combining Amoxicillin and Ibuprofen."
+  },
+  {
+    "id": "40000000-0000-0000-0000-000000000010",
+    "medicine_a_id": "10000000-0000-0000-0000-000000000001",
+    "medicine_b_id": "10000000-0000-0000-0000-000000000009",
+    "severity_level": "minor",
+    "description": "Minor interaction: gastric pH elevation may mildly alter Amoxicillin absorption."
+  }
+]

@@ -1,0 +1,354 @@
+[
+  {
+    "id": "10000000-0000-0000-0000-000000000001",
+    "inn_name_ru": "Амоксициллин",
+    "inn_name_kz": "Амоксициллин",
+    "inn_name_en": "Amoxicillin",
+    "atc_code": "J01CA04",
+    "is_prescription_required": true,
+    "is_antibiotic": true,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000001",
+        "form_type": "Capsules",
+        "dosage_value": 500,
+        "dosage_unit": "mg",
+        "package_quantity": 20,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000001", "trade_name": "Flemoxin Solutab", "manufacturer": "Astellas Pharma", "country": "Netherlands", "reg_number": "RK-LS-5-010001"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000002",
+    "inn_name_ru": "Азитромицин",
+    "inn_name_kz": "Азитромицин",
+    "inn_name_en": "Azithromycin",
+    "atc_code": "J01FA10",
+    "is_prescription_required": true,
+    "is_antibiotic": true,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000002",
+        "form_type": "Tablets",
+        "dosage_value": 500,
+        "dosage_unit": "mg",
+        "package_quantity": 3,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000002", "trade_name": "Sumamed", "manufacturer": "Pliva Hrvatska", "country": "Croatia", "reg_number": "RK-LS-5-010002"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000003",
+    "inn_name_ru": "Ципрофлоксацин",
+    "inn_name_kz": "Ципрофлоксацин",
+    "inn_name_en": "Ciprofloxacin",
+    "atc_code": "J01MA02",
+    "is_prescription_required": true,
+    "is_antibiotic": true,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000003",
+        "form_type": "Tablets",
+        "dosage_value": 500,
+        "dosage_unit": "mg",
+        "package_quantity": 10,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000003", "trade_name": "Ciprinol", "manufacturer": "KRKA", "country": "Slovenia", "reg_number": "RK-LS-5-010003"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000004",
+    "inn_name_ru": "Варфарин",
+    "inn_name_kz": "Варфарин",
+    "inn_name_en": "Warfarin",
+    "atc_code": "B01AA03",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000004",
+        "form_type": "Tablets",
+        "dosage_value": 2.5,
+        "dosage_unit": "mg",
+        "package_quantity": 100,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000004", "trade_name": "Warfarin Nycomed", "manufacturer": "Takeda", "country": "Poland", "reg_number": "RK-LS-5-010004"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000005",
+    "inn_name_ru": "Ацетилсалициловая кислота",
+    "inn_name_kz": "Ацетилсалицил қышқылы",
+    "inn_name_en": "Aspirin",
+    "atc_code": "B01AC06",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000005",
+        "form_type": "Tablets",
+        "dosage_value": 100,
+        "dosage_unit": "mg",
+        "package_quantity": 30,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000005", "trade_name": "Aspirin Cardio", "manufacturer": "Bayer", "country": "Germany", "reg_number": "RK-LS-5-010005"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000006",
+    "inn_name_ru": "Ибупрофен",
+    "inn_name_kz": "Ибупрофен",
+    "inn_name_en": "Ibuprofen",
+    "atc_code": "M01AE01",
+    "is_prescription_required": false,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000006",
+        "form_type": "Tablets",
+        "dosage_value": 400,
+        "dosage_unit": "mg",
+        "package_quantity": 20,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000006", "trade_name": "Nurofen Forte", "manufacturer": "Reckitt Benckiser", "country": "UK", "reg_number": "RK-LS-5-010006"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000007",
+    "inn_name_ru": "Метформин",
+    "inn_name_kz": "Метформин",
+    "inn_name_en": "Metformin",
+    "atc_code": "A10BA02",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000007",
+        "form_type": "Tablets",
+        "dosage_value": 850,
+        "dosage_unit": "mg",
+        "package_quantity": 60,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000007", "trade_name": "Glucophage", "manufacturer": "Merck Sante", "country": "France", "reg_number": "RK-LS-5-010007"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000008",
+    "inn_name_ru": "Лизиноприл",
+    "inn_name_kz": "Лизиноприл",
+    "inn_name_en": "Lisinopril",
+    "atc_code": "C09AA03",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000008",
+        "form_type": "Tablets",
+        "dosage_value": 10,
+        "dosage_unit": "mg",
+        "package_quantity": 30,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000008", "trade_name": "Diroton", "manufacturer": "Gedeon Richter", "country": "Hungary", "reg_number": "RK-LS-5-010008"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000009",
+    "inn_name_ru": "Омепразол",
+    "inn_name_kz": "Омепразол",
+    "inn_name_en": "Omeprazole",
+    "atc_code": "A02BC01",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000009",
+        "form_type": "Capsules",
+        "dosage_value": 20,
+        "dosage_unit": "mg",
+        "package_quantity": 30,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000009", "trade_name": "Omez", "manufacturer": "Dr. Reddy's", "country": "India", "reg_number": "RK-LS-5-010009"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000010",
+    "inn_name_ru": "Цефтриаксон",
+    "inn_name_kz": "Цефтриаксон",
+    "inn_name_en": "Ceftriaxone",
+    "atc_code": "J01DD04",
+    "is_prescription_required": true,
+    "is_antibiotic": true,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000010",
+        "form_type": "Powder for injection",
+        "dosage_value": 1000,
+        "dosage_unit": "mg",
+        "package_quantity": 1,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000010", "trade_name": "Rocephin", "manufacturer": "Roche", "country": "Switzerland", "reg_number": "RK-LS-5-010010"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000011",
+    "inn_name_ru": "Клопидогрел",
+    "inn_name_kz": "Клопидогрел",
+    "inn_name_en": "Clopidogrel",
+    "atc_code": "B01AC04",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000011",
+        "form_type": "Tablets",
+        "dosage_value": 75,
+        "dosage_unit": "mg",
+        "package_quantity": 28,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000011", "trade_name": "Plavix", "manufacturer": "Sanofi", "country": "France", "reg_number": "RK-LS-5-010011"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000012",
+    "inn_name_ru": "Аторвастатин",
+    "inn_name_kz": "Аторвастатин",
+    "inn_name_en": "Atorvastatin",
+    "atc_code": "C10AA05",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000012",
+        "form_type": "Tablets",
+        "dosage_value": 20,
+        "dosage_unit": "mg",
+        "package_quantity": 30,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000012", "trade_name": "Atoris", "manufacturer": "KRKA", "country": "Slovenia", "reg_number": "RK-LS-5-010012"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000013",
+    "inn_name_ru": "Доксициклин",
+    "inn_name_kz": "Доксициклин",
+    "inn_name_en": "Doxycycline",
+    "atc_code": "J01AA02",
+    "is_prescription_required": true,
+    "is_antibiotic": true,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000013",
+        "form_type": "Capsules",
+        "dosage_value": 100,
+        "dosage_unit": "mg",
+        "package_quantity": 10,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000013", "trade_name": "Unidox Solutab", "manufacturer": "Astellas Pharma", "country": "Netherlands", "reg_number": "RK-LS-5-010013"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000014",
+    "inn_name_ru": "Лозартан",
+    "inn_name_kz": "Лозартан",
+    "inn_name_en": "Losartan",
+    "atc_code": "C09CA01",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000014",
+        "form_type": "Tablets",
+        "dosage_value": 50,
+        "dosage_unit": "mg",
+        "package_quantity": 30,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000014", "trade_name": "Lorista", "manufacturer": "KRKA", "country": "Slovenia", "reg_number": "RK-LS-5-010014"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000015",
+    "inn_name_ru": "Парацетамол",
+    "inn_name_kz": "Парацетамол",
+    "inn_name_en": "Paracetamol",
+    "atc_code": "N02BE01",
+    "is_prescription_required": false,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000015",
+        "form_type": "Tablets",
+        "dosage_value": 500,
+        "dosage_unit": "mg",
+        "package_quantity": 20,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000015", "trade_name": "Panadol", "manufacturer": "GSK", "country": "Ireland", "reg_number": "RK-LS-5-010015"}
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-0000-0000-000000000016",
+    "inn_name_ru": "Сальбутамол",
+    "inn_name_kz": "Сальбутамол",
+    "inn_name_en": "Salbutamol",
+    "atc_code": "R03AC02",
+    "is_prescription_required": true,
+    "is_antibiotic": false,
+    "is_narcotic": false,
+    "forms": [
+      {
+        "id": "20000000-0000-0000-0000-000000000016",
+        "form_type": "Inhaler aerosol",
+        "dosage_value": 100,
+        "dosage_unit": "mcg/dose",
+        "package_quantity": 200,
+        "brands": [
+          {"id": "30000000-0000-0000-0000-000000000016", "trade_name": "Ventolin", "manufacturer": "GSK", "country": "Spain", "reg_number": "RK-LS-5-010016"}
+        ]
+      }
+    ]
+  }
+]
