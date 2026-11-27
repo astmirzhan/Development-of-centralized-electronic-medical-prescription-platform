@@ -9,11 +9,11 @@ import (
 
 // Typed PKI verification errors.
 var (
-	ErrInvalidSignature       = errors.New("EDS cryptographic signature is invalid")
-	ErrCertificateRevoked     = errors.New("EDS certificate is revoked or expired")
-	ErrSignerIINMismatch      = errors.New("EDS signer IIN does not match expected actor IIN")
-	ErrPayloadMismatch        = errors.New("EDS signed payload does not match canonical record")
-	ErrVerifierUnavailable    = errors.New("NCANode verification service unavailable")
+	ErrInvalidSignature        = errors.New("EDS cryptographic signature is invalid")
+	ErrCertificateRevoked      = errors.New("EDS certificate is revoked or expired")
+	ErrSignerIINMismatch       = errors.New("EDS signer IIN does not match expected actor IIN")
+	ErrPayloadMismatch         = errors.New("EDS signed payload does not match canonical record")
+	ErrVerifierUnavailable     = errors.New("NCANode verification service unavailable")
 	ErrTestModeForbiddenInProd = errors.New("mock PKI verifier is forbidden when APP_ENV=production")
 )
 
