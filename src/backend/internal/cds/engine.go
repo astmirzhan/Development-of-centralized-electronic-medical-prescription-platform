@@ -35,7 +35,7 @@ func NewService(repo Repository, logger *slog.Logger) *Service {
 
 // Evaluate executes all four clinical safety checks and applies the severity decision policy.
 func (s *Service) Evaluate(ctx context.Context, req CheckRequest) (*CheckResult, error) {
-	start := s.nowFn()
+	startedAt := time.Now()
 	if err := validateRequest(req); err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (s *Service) Evaluate(ctx context.Context, req CheckRequest) (*CheckResult,
 	// Check D: ICD-10 diagnosis compatibility / antibiotic stewardship.
 	warnings = append(warnings, evaluateDiagnosisCompatibility(diagnosis, resolvedForms)...)
 
-	result := applyDecisionPolicy(warnings, req.Justification, s.nowFn(), time.Since(start).Milliseconds())
+	result := applyDecisionPolicy(warnings, req.Justification, s.nowFn(), time.Since(startedAt).Milliseconds())
 
 	s.logger.Info("cds_evaluation",
 		"patient_id", req.PatientID,
