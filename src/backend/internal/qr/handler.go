@@ -27,7 +27,7 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 
 // RegisterRoutes mounts QR endpoints under /api/v1.
 func (h *Handler) RegisterRoutes(r chi.Router) {
-	r.Post("/prescription-items/{itemId}/qr", h.Issue)
+	r.With(auth.RequireRole(auth.RolePatient)).Post("/prescription-items/{itemId}/qr", h.Issue)
 }
 
 // Issue handles POST /api/v1/prescription-items/{itemId}/qr.

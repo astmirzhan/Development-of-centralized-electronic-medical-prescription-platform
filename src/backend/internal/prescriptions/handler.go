@@ -28,8 +28,8 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 
 // RegisterRoutes mounts prescription signing endpoints under /api/v1.
 func (h *Handler) RegisterRoutes(r chi.Router) {
-	r.Post("/prescriptions/{id}/canonical", h.Canonical)
-	r.Post("/prescriptions/{id}/sign", h.Sign)
+	r.With(auth.RequireRole(auth.RoleDoctor, auth.RoleAdmin)).Post("/prescriptions/{id}/canonical", h.Canonical)
+	r.With(auth.RequireRole(auth.RoleDoctor)).Post("/prescriptions/{id}/sign", h.Sign)
 }
 
 type signRequest struct {

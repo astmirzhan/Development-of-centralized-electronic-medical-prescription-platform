@@ -91,15 +91,40 @@ func (s *Service) GetCanonical(ctx context.Context, prescriptionID uuid.UUID, ac
 	}, nil
 }
 
-// Sign verifies the doctor's CMS EDS signature, persists it, activates the prescription,
-// and appends an audit log entry inside one PostgreSQL transaction.
+// Sign verifies the doctor's CMS EDS signature before taking row locks, then persists
+// the signature, activates the prescription, and appends an audit log entry inside one transaction.
 func (s *Service) Sign(ctx context.Context, prescriptionID uuid.UUID, actor auth.ActorContext, cmsBase64 string) (*SignResult, error) {
 	if strings.TrimSpace(cmsBase64) == "" {
 		return nil, ErrInvalidSigningRequest
 	}
+	if strings.TrimSpace(actor.IIN) == "" {
+		return nil, ErrForbiddenActor
+	}
+
+	// Pre-lock read + external PKI HTTP verification so slow NCANode never holds DB row locks.
+	preDetails, err := s.repo.GetDetails(ctx, prescriptionID)
+	if err != nil {
+		return nil, err
+	}
+	if preDetails.DoctorID != actor.UserID {
+		return nil, ErrForbiddenActor
+	}
+	if preDetails.Status != "draft" {
+		return nil, ErrInvalidStatusTransition
+	}
+
+	canonicalBytes, hashHex, err := SerializeCanonical(preDetails.Input)
+	if err != nil {
+		return nil, err
+	}
+
+	verified, err := s.verifier.VerifyCMS(ctx, cmsBase64, canonicalBytes, actor.IIN)
+	if err != nil {
+		return nil, err
+	}
 
 	var res *SignResult
-	err := s.txRunner.WithTx(ctx, func(tx pgx.Tx) error {
+	err = s.txRunner.WithTx(ctx, func(tx pgx.Tx) error {
 		details, err := s.repo.LockDetailsForSignTx(ctx, tx, prescriptionID)
 		if err != nil {
 			return err
@@ -111,14 +136,12 @@ func (s *Service) Sign(ctx context.Context, prescriptionID uuid.UUID, actor auth
 			return ErrInvalidStatusTransition
 		}
 
-		canonicalBytes, hashHex, err := SerializeCanonical(details.Input)
+		_, lockedHashHex, err := SerializeCanonical(details.Input)
 		if err != nil {
 			return err
 		}
-
-		verified, err := s.verifier.VerifyCMS(ctx, cmsBase64, canonicalBytes, actor.IIN)
-		if err != nil {
-			return err
+		if lockedHashHex != hashHex {
+			return ErrInvalidStatusTransition
 		}
 
 		signedAt := time.Now().UTC()

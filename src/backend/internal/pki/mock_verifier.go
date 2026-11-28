@@ -8,11 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
-
-const defaultTestSecret = "erx-dev-mock-pki-hmac-secret"
 
 // TestEnvelope is the structured payload accepted by MockVerifier when NCA_TEST_MODE=true.
 type TestEnvelope struct {
@@ -29,13 +28,15 @@ type MockVerifier struct {
 	secret []byte
 }
 
-// NewMockVerifier constructs a MockVerifier, refusing to initialize in production.
+// NewMockVerifier constructs a MockVerifier, refusing to initialize outside development/test
+// environments or when no explicit secret is supplied.
 func NewMockVerifier(appEnv string, testMode bool, secret string) (*MockVerifier, error) {
-	if strings.EqualFold(strings.TrimSpace(appEnv), "production") || !testMode {
+	normalizedEnv := strings.ToLower(strings.TrimSpace(appEnv))
+	if (normalizedEnv != "development" && normalizedEnv != "test") || !testMode {
 		return nil, ErrTestModeForbiddenInProd
 	}
 	if strings.TrimSpace(secret) == "" {
-		secret = defaultTestSecret
+		return nil, errors.New("NCA_MOCK_SECRET is required for mock PKI verifier")
 	}
 	return &MockVerifier{secret: []byte(secret)}, nil
 }
@@ -48,7 +49,7 @@ func CreateTestEnvelope(secret, signerIIN, certSerial string, canonical []byte) 
 // CreateTestEnvelopeWithOCSP generates a signed base64 envelope with an explicit OCSP status.
 func CreateTestEnvelopeWithOCSP(secret, signerIIN, certSerial, ocspStatus string, canonical []byte) (string, error) {
 	if strings.TrimSpace(secret) == "" {
-		secret = defaultTestSecret
+		return "", errors.New("secret is required to create test envelope")
 	}
 	if strings.TrimSpace(ocspStatus) == "" {
 		ocspStatus = "GOOD"
@@ -75,6 +76,10 @@ func (m *MockVerifier) VerifyCMS(_ context.Context, cmsBase64 string, expectedCa
 	}
 	if len(expectedCanonical) == 0 {
 		return nil, fmt.Errorf("%w: empty canonical data", ErrPayloadMismatch)
+	}
+	expectedIIN := strings.TrimSpace(expectedSignerIIN)
+	if expectedIIN == "" {
+		return nil, fmt.Errorf("%w: expected signer IIN is required", ErrSignerIINMismatch)
 	}
 
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(cmsBase64))
@@ -107,8 +112,8 @@ func (m *MockVerifier) VerifyCMS(_ context.Context, cmsBase64 string, expectedCa
 		return nil, fmt.Errorf("%w: hash mismatch", ErrPayloadMismatch)
 	}
 
-	if strings.TrimSpace(expectedSignerIIN) != "" && env.SignerIIN != strings.TrimSpace(expectedSignerIIN) {
-		return nil, fmt.Errorf("%w: got %s, expected %s", ErrSignerIINMismatch, env.SignerIIN, expectedSignerIIN)
+	if env.SignerIIN != expectedIIN {
+		return nil, fmt.Errorf("%w: got %s, expected %s", ErrSignerIINMismatch, env.SignerIIN, expectedIIN)
 	}
 
 	return &VerificationResult{

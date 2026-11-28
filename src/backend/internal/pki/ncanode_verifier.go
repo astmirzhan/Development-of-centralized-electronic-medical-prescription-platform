@@ -79,6 +79,10 @@ func (v *NCANodeVerifier) VerifyCMS(ctx context.Context, cmsBase64 string, expec
 	if len(expectedCanonical) == 0 {
 		return nil, fmt.Errorf("%w: empty canonical data", ErrPayloadMismatch)
 	}
+	expectedIIN := strings.TrimSpace(expectedSignerIIN)
+	if expectedIIN == "" {
+		return nil, fmt.Errorf("%w: expected signer IIN is required", ErrSignerIINMismatch)
+	}
 
 	reqBody := ncaVerifyRequest{
 		RevocationCheck: []string{"OCSP"},
@@ -124,15 +128,16 @@ func (v *NCANodeVerifier) VerifyCMS(ctx context.Context, cmsBase64 string, expec
 		return nil, fmt.Errorf("%w: %s", ErrInvalidSignature, parsed.Message)
 	}
 
-	// Check (d): Signed payload matches canonical record when NCANode returns embedded data.
-	if strings.TrimSpace(parsed.Data) != "" {
-		decodedData, err := base64.StdEncoding.DecodeString(parsed.Data)
-		if err != nil {
-			return nil, fmt.Errorf("%w: invalid base64 data from NCANode", ErrPayloadMismatch)
-		}
-		if subtle.ConstantTimeCompare(decodedData, expectedCanonical) != 1 {
-			return nil, ErrPayloadMismatch
-		}
+	// Check (d): Fail closed unless NCANode returns signed data matching canonical bytes.
+	if strings.TrimSpace(parsed.Data) == "" {
+		return nil, fmt.Errorf("%w: NCANode response omitted signed data", ErrPayloadMismatch)
+	}
+	decodedData, err := base64.StdEncoding.DecodeString(parsed.Data)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid base64 data from NCANode", ErrPayloadMismatch)
+	}
+	if subtle.ConstantTimeCompare(decodedData, expectedCanonical) != 1 {
+		return nil, ErrPayloadMismatch
 	}
 
 	signerIIN, serialNumber, ocspStatus, certValid, revoked := extractSignerDetails(parsed.Signers[0])
@@ -144,8 +149,8 @@ func (v *NCANodeVerifier) VerifyCMS(ctx context.Context, cmsBase64 string, expec
 		return nil, fmt.Errorf("%w: ocsp=%s", ErrCertificateRevoked, ocspStatus)
 	}
 	// Check (c): Signer IIN must match expected actor IIN.
-	if strings.TrimSpace(expectedSignerIIN) != "" && signerIIN != strings.TrimSpace(expectedSignerIIN) {
-		return nil, fmt.Errorf("%w: got %s, expected %s", ErrSignerIINMismatch, signerIIN, expectedSignerIIN)
+	if signerIIN != expectedIIN {
+		return nil, fmt.Errorf("%w: got %s, expected %s", ErrSignerIINMismatch, signerIIN, expectedIIN)
 	}
 
 	return &VerificationResult{

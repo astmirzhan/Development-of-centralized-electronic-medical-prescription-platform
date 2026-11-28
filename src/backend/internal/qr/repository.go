@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/xjam-byte/erx-platform/backend/internal/database"
 )
 
 // Repository manages persistence and pessimistic locking for qr_tokens.
@@ -68,25 +69,42 @@ func (r *PGRepository) GetItemEligibility(ctx context.Context, prescriptionItemI
 	return &e, nil
 }
 
-// InsertToken stores a hashed single-use QR token in qr_tokens (never stores raw token).
+// InsertToken expires earlier unconsumed tokens for the item and stores a new hashed
+// single-use QR token in qr_tokens inside one transaction (never stores raw token).
 func (r *PGRepository) InsertToken(ctx context.Context, itemID uuid.UUID, tokenHash, nonce string, expiresAt time.Time) (*QRToken, error) {
 	var tok QRToken
-	err := r.pool.QueryRow(ctx, `
-		INSERT INTO qr_tokens (
-			prescription_item_id, token_hash, nonce, expires_at, is_consumed
-		) VALUES ($1, $2, $3, $4, false)
-		RETURNING id, prescription_item_id, token_hash, nonce, expires_at, is_consumed, created_at
-	`, itemID, tokenHash, nonce, expiresAt.UTC()).Scan(
-		&tok.ID,
-		&tok.PrescriptionItemID,
-		&tok.TokenHash,
-		&tok.Nonce,
-		&tok.ExpiresAt,
-		&tok.IsConsumed,
-		&tok.CreatedAt,
-	)
+	err := database.WithTx(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			UPDATE qr_tokens
+			SET expires_at = NOW()
+			WHERE prescription_item_id = $1
+			  AND is_consumed = false
+			  AND expires_at > NOW()
+		`, itemID); err != nil {
+			return fmt.Errorf("expire previous qr tokens: %w", err)
+		}
+
+		err := tx.QueryRow(ctx, `
+			INSERT INTO qr_tokens (
+				prescription_item_id, token_hash, nonce, expires_at, is_consumed
+			) VALUES ($1, $2, $3, $4, false)
+			RETURNING id, prescription_item_id, token_hash, nonce, expires_at, is_consumed, created_at
+		`, itemID, tokenHash, nonce, expiresAt.UTC()).Scan(
+			&tok.ID,
+			&tok.PrescriptionItemID,
+			&tok.TokenHash,
+			&tok.Nonce,
+			&tok.ExpiresAt,
+			&tok.IsConsumed,
+			&tok.CreatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("insert qr token: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("insert qr token: %w", err)
+		return nil, err
 	}
 	return &tok, nil
 }

@@ -11,8 +11,13 @@ import (
 )
 
 func TestMockVerifierSecurityInvariants(t *testing.T) {
-	if _, err := NewMockVerifier("production", true, "secret"); !errors.Is(err, ErrTestModeForbiddenInProd) {
-		t.Fatalf("expected ErrTestModeForbiddenInProd in production, got %v", err)
+	for _, disallowedEnv := range []string{"production", "staging", "prod", "Production"} {
+		if _, err := NewMockVerifier(disallowedEnv, true, "secret"); !errors.Is(err, ErrTestModeForbiddenInProd) {
+			t.Fatalf("expected ErrTestModeForbiddenInProd in %s, got %v", disallowedEnv, err)
+		}
+	}
+	if _, err := NewMockVerifier("development", true, ""); err == nil {
+		t.Fatal("expected error when NCA_MOCK_SECRET is empty")
 	}
 
 	v, err := NewMockVerifier("development", true, "secret-key")
@@ -32,6 +37,11 @@ func TestMockVerifierSecurityInvariants(t *testing.T) {
 	}
 	if !res.Valid || res.SignerIIN != "840315301294" || res.OCSPStatus != "GOOD" {
 		t.Fatalf("unexpected verification result: %#v", res)
+	}
+
+	// Empty expected signer IIN must fail closed.
+	if _, err := v.VerifyCMS(context.Background(), env, canonical, ""); !errors.Is(err, ErrSignerIINMismatch) {
+		t.Fatalf("expected ErrSignerIINMismatch for empty expected IIN, got %v", err)
 	}
 
 	// Tampered canonical bytes must fail.

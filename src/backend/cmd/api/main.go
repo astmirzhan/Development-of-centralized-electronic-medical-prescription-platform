@@ -56,7 +56,7 @@ func main() {
 
 	var pkiVerifier pki.Verifier
 	if cfg.NCATestMode {
-		mockVerifier, err := pki.NewMockVerifier(cfg.AppEnv, cfg.NCATestMode, cfg.JWTSigningKey)
+		mockVerifier, err := pki.NewMockVerifier(cfg.AppEnv, cfg.NCATestMode, cfg.NCAMockSecret)
 		if err != nil {
 			logger.Error("failed to initialize mock PKI verifier", "error", err)
 			os.Exit(1)
