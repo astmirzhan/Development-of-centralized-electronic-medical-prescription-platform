@@ -210,3 +210,24 @@ func (r *PGRepository) GetDiagnosis(ctx context.Context, diagnosisID int) (*Diag
 	}
 	return &diag, nil
 }
+
+// IsVerifiedDoctor checks whether doctorID holds a verified doctor profile linked to a verified clinic.
+func (r *PGRepository) IsVerifiedDoctor(ctx context.Context, doctorID uuid.UUID) (bool, error) {
+	var verified bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM doctor_profiles dp
+			JOIN doctor_clinics dc ON dc.doctor_id = dp.user_id
+			JOIN organizations o ON o.id = dc.clinic_id
+			WHERE dp.user_id = $1
+			  AND dp.is_verified = true
+			  AND o.org_type = 'clinic'
+			  AND o.is_verified = true
+		)
+	`, doctorID).Scan(&verified)
+	if err != nil {
+		return false, fmt.Errorf("verify doctor access: %w", err)
+	}
+	return verified, nil
+}

@@ -50,7 +50,7 @@ func main() {
 
 	cdsRepo := cds.NewPGRepository(pool)
 	cdsService := cds.NewService(cdsRepo, logger)
-	cdsHandler := cds.NewHandler(cdsService, logger)
+	cdsHandler := cds.NewHandlerWithVerifier(cdsService, cdsRepo, logger)
 
 	handler := httpserver.NewRouter(httpserver.RouterDeps{
 		Logger:             logger,

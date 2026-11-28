@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/xjam-byte/erx-platform/backend/internal/auth"
 	"github.com/xjam-byte/erx-platform/backend/internal/httpserver"
 )
 
@@ -304,15 +305,19 @@ func TestAgeInYears(t *testing.T) {
 	}
 }
 
+type stubDoctorVerifier struct {
+	verified bool
+}
+
+func (s stubDoctorVerifier) IsVerifiedDoctor(_ context.Context, _ uuid.UUID) (bool, error) {
+	return s.verified, nil
+}
+
 func TestCDSHTTPHandler(t *testing.T) {
 	repo, _, formIDs := newFixtureRepo()
 	svc := NewService(repo, nil)
-	h := NewHandler(svc, nil)
-	router := httpserver.NewRouter(httpserver.RouterDeps{
-		RegisterRoutes: func(r chi.Router) {
-			h.RegisterRoutes(r)
-		},
-	})
+	docVerifier := &stubDoctorVerifier{verified: true}
+	h := NewHandlerWithVerifier(svc, docVerifier, nil)
 
 	payload, _ := json.Marshal(CheckRequest{
 		PatientID:       repo.profile.PatientID,
@@ -320,6 +325,47 @@ func TestCDSHTTPHandler(t *testing.T) {
 		MedicineFormIDs: []uuid.UUID{formIDs["paracetamol"]},
 	})
 
+	// 1. Unauthenticated request must return 401.
+	unauthRouter := httpserver.NewRouter(httpserver.RouterDeps{RegisterRoutes: h.RegisterRoutes})
+	unauthRec := httptest.NewRecorder()
+	unauthRouter.ServeHTTP(unauthRec, httptest.NewRequest(http.MethodPost, "/api/v1/cds/check", bytes.NewReader(payload)))
+	if unauthRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized, got %d", unauthRec.Code)
+	}
+
+	var currentActor auth.ActorContext
+	router := httpserver.NewRouter(httpserver.RouterDeps{
+		RegisterRoutes: func(r chi.Router) {
+			r.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					next.ServeHTTP(w, r.WithContext(auth.WithActor(r.Context(), currentActor)))
+				})
+			})
+			h.RegisterRoutes(r)
+		},
+	})
+
+	// 2. Patient / Pharmacist role must return 403 Forbidden.
+	for _, forbiddenRole := range []string{auth.RolePatient, auth.RolePharmacist} {
+		currentActor = auth.ActorContext{UserID: uuid.New(), IIN: "981105303419", Role: forbiddenRole}
+		rec403 := httptest.NewRecorder()
+		router.ServeHTTP(rec403, httptest.NewRequest(http.MethodPost, "/api/v1/cds/check", bytes.NewReader(payload)))
+		if rec403.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden for role %s, got %d", forbiddenRole, rec403.Code)
+		}
+	}
+
+	// 3. Unverified doctor must return 403 Forbidden.
+	currentActor = auth.ActorContext{UserID: uuid.New(), IIN: "840315301294", Role: auth.RoleDoctor}
+	docVerifier.verified = false
+	unverifiedRec := httptest.NewRecorder()
+	router.ServeHTTP(unverifiedRec, httptest.NewRequest(http.MethodPost, "/api/v1/cds/check", bytes.NewReader(payload)))
+	if unverifiedRec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for unverified doctor, got %d", unverifiedRec.Code)
+	}
+
+	// 4. Verified doctor succeeds with 200 OK.
+	docVerifier.verified = true
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/cds/check", bytes.NewReader(payload))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
