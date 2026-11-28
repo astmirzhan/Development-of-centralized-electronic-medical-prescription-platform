@@ -59,6 +59,7 @@ func TestNCANodeVerifierErrorAndFlatSignerCases(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			resp := ncaVerifyResponse{
 				Valid: true,
+				Data:  base64.StdEncoding.EncodeToString(canonical),
 				Signers: []ncaSigner{{
 					Subject:      &ncaSubject{IIN: "111111111111"},
 					SerialNumber: "FLAT-001",
@@ -72,6 +73,26 @@ func TestNCANodeVerifierErrorAndFlatSignerCases(t *testing.T) {
 		c := NewNCANodeVerifier(srv.URL, srv.Client())
 		if _, err := c.VerifyCMS(context.Background(), "ZmFrZQ==", canonical, "840315301294"); !errors.Is(err, ErrSignerIINMismatch) {
 			t.Fatalf("expected ErrSignerIINMismatch, got %v", err)
+		}
+	})
+
+	t.Run("empty data from NCANode fails closed with ErrPayloadMismatch", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			resp := ncaVerifyResponse{
+				Valid: true,
+				Signers: []ncaSigner{{
+					Subject:      &ncaSubject{IIN: "840315301294"},
+					SerialNumber: "FLAT-001",
+					OCSPStatus:   "GOOD",
+				}},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+		}))
+		defer srv.Close()
+
+		c := NewNCANodeVerifier(srv.URL, srv.Client())
+		if _, err := c.VerifyCMS(context.Background(), "ZmFrZQ==", canonical, "840315301294"); !errors.Is(err, ErrPayloadMismatch) {
+			t.Fatalf("expected ErrPayloadMismatch when NCANode omits data, got %v", err)
 		}
 	})
 
@@ -95,7 +116,7 @@ func TestNCANodeVerifierErrorAndFlatSignerCases(t *testing.T) {
 }
 
 func TestMockVerifierEdgeCases(t *testing.T) {
-	v, err := NewMockVerifier("development", true, "")
+	v, err := NewMockVerifier("development", true, "test-secret")
 	if err != nil {
 		t.Fatalf("NewMockVerifier error: %v", err)
 	}

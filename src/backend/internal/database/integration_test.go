@@ -7,8 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/xjam-byte/erx-platform/backend/internal/audit"
+	"github.com/xjam-byte/erx-platform/backend/internal/database"
 	"github.com/xjam-byte/erx-platform/backend/internal/seed"
 	"github.com/xjam-byte/erx-platform/backend/internal/testutil"
 )
@@ -132,5 +135,81 @@ func assertPGCode(t *testing.T, err error, expectedCode, label string) {
 	}
 	if pgErr.Code != expectedCode {
 		t.Fatalf("%s: expected SQLSTATE %s, got %s (%s)", label, expectedCode, pgErr.Code, pgErr.Message)
+	}
+}
+
+func TestAuditLogHashChainVerificationPG16(t *testing.T) {
+	pool := testutil.SetupSeededDB(t)
+	ctx := context.Background()
+	logger := audit.NewPGLogger()
+
+	actorID := seed.DoctorUserID
+	e1 := uuid.New()
+	e2 := uuid.New()
+
+	err := database.WithTx(ctx, pool, func(tx pgx.Tx) error {
+		if err := logger.AppendTx(ctx, tx, audit.Entry{
+			ActorID:    &actorID,
+			Action:     "prescription:create",
+			EntityType: "prescription",
+			EntityID:   &e1,
+			Payload:    map[string]any{"step": 1},
+		}); err != nil {
+			return err
+		}
+		return logger.AppendTx(ctx, tx, audit.Entry{
+			ActorID:    &actorID,
+			Action:     "prescription:sign",
+			EntityType: "prescription",
+			EntityID:   &e2,
+			Payload:    map[string]any{"step": 2},
+		})
+	})
+	if err != nil {
+		t.Fatalf("append audit chain: %v", err)
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT COALESCE(prev_record_hash, ''), record_hash, actor_id, action, entity_type, entity_id, payload, created_at
+		FROM audit_logs
+		ORDER BY id ASC
+	`)
+	if err != nil {
+		t.Fatalf("query audit_logs: %v", err)
+	}
+	defer rows.Close()
+
+	var expectedPrev string
+	var count int
+	for rows.Next() {
+		var (
+			prevHash, recordHash, action, entityType string
+			rowActorID, rowEntityID                  *uuid.UUID
+			payload                                  []byte
+			createdAt                                time.Time
+		)
+		if err := rows.Scan(&prevHash, &recordHash, &rowActorID, &action, &entityType, &rowEntityID, &payload, &createdAt); err != nil {
+			t.Fatalf("scan audit row: %v", err)
+		}
+		if prevHash != expectedPrev {
+			t.Fatalf("broken prev_record_hash at row %d: got %q, want %q", count, prevHash, expectedPrev)
+		}
+		recomputed := audit.ComputeRecordHash(prevHash, audit.Entry{
+			ActorID:    rowActorID,
+			Action:     action,
+			EntityType: entityType,
+			EntityID:   rowEntityID,
+		}, payload, createdAt)
+		if recomputed != recordHash {
+			t.Fatalf("hash mismatch at row %d: recomputed %s != stored %s", count, recomputed, recordHash)
+		}
+		expectedPrev = recordHash
+		count++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate audit rows: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 audit rows, got %d", count)
 	}
 }

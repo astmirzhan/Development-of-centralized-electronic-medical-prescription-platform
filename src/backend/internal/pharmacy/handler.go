@@ -28,7 +28,7 @@ func NewHandler(service *Service, logger *slog.Logger) *Handler {
 
 // RegisterRoutes mounts pharmacy dispensing endpoints under /api/v1.
 func (h *Handler) RegisterRoutes(r chi.Router) {
-	r.Post("/dispensing", h.Dispense)
+	r.With(auth.RequireRole(auth.RolePharmacist)).Post("/dispensing", h.Dispense)
 }
 
 // Dispense handles POST /api/v1/dispensing.

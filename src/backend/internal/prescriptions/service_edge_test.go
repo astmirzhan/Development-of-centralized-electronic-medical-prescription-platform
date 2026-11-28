@@ -157,7 +157,18 @@ func TestPrescriptionHandlerErrorPaths(t *testing.T) {
 			t.Fatalf("expected 404, got %d", missingRec.Code)
 		}
 
+		// Forbidden when actor IIN is empty -> 403
+		currentActor = auth.ActorContext{UserID: doctorID, IIN: "", Role: auth.RoleDoctor}
+		emptyIINBody, _ := json.Marshal(signRequest{CMSSignature: "ZmFrZQ=="})
+		emptyIINReq := httptest.NewRequest(http.MethodPost, "/api/v1/prescriptions/"+rxID.String()+"/sign", bytes.NewReader(emptyIINBody))
+		emptyIINRec := httptest.NewRecorder()
+		router.ServeHTTP(emptyIINRec, emptyIINReq)
+		if emptyIINRec.Code != http.StatusForbidden {
+			t.Fatalf("expected 403 for empty actor IIN, got %d", emptyIINRec.Code)
+		}
+
 		// Invalid CMS signature -> 422
+		currentActor = auth.ActorContext{UserID: doctorID, IIN: "840315301294", Role: auth.RoleDoctor}
 		body, _ := json.Marshal(signRequest{CMSSignature: "invalid-base64-cms"})
 		badSigReq := httptest.NewRequest(http.MethodPost, "/api/v1/prescriptions/"+rxID.String()+"/sign", bytes.NewReader(body))
 		badSigRec := httptest.NewRecorder()

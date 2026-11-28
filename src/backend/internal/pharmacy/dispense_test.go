@@ -222,6 +222,20 @@ func TestPartialThenFullDispensePG16(t *testing.T) {
 	if dbRxStatus != "fully_dispensed" {
 		t.Fatalf("expected DB prescription status fully_dispensed, got %s", dbRxStatus)
 	}
+
+	// Verify signatures.entity_id matches dispensing_events.id for every signed dispense.
+	var joinedCount int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM signatures s
+		JOIN dispensing_events d ON d.id = s.entity_id
+		WHERE d.id IN ($1, $2) AND s.entity_type = 'dispensing'
+	`, res1.DispensingEventID, res2.DispensingEventID).Scan(&joinedCount); err != nil {
+		t.Fatalf("verify signature entity_id join: %v", err)
+	}
+	if joinedCount != 2 {
+		t.Fatalf("expected 2 dispensing signatures joined via entity_id = dispensing_events.id, got %d", joinedCount)
+	}
 }
 
 func TestDispenseValidationAndErrorMappingsPG16(t *testing.T) {
@@ -348,6 +362,12 @@ func TestDispenseAdditionalBranchesPG16(t *testing.T) {
 		t.Fatalf("expected ErrForbiddenPharmacist for unknown profile, got %v", err)
 	}
 
+	// 3b. Empty pharmacist IIN -> ErrForbiddenPharmacist
+	emptyIINActor := auth.ActorContext{UserID: seed.PharmacistUserID, IIN: "", Role: auth.RolePharmacist}
+	if _, err := pharmSvc.Dispense(ctx, emptyIINActor, signDispenseReq(t, issued.Token, pharmacist.IIN, brandID, 1)); !errors.Is(err, pharmacy.ErrForbiddenPharmacist) {
+		t.Fatalf("expected ErrForbiddenPharmacist for empty actor IIN, got %v", err)
+	}
+
 	// 4. Non-existent medicine brand UUID -> ErrBrandMismatch
 	if _, err := pharmSvc.Dispense(ctx, pharmacist, signDispenseReq(t, issued.Token, pharmacist.IIN, uuid.New(), 1)); !errors.Is(err, pharmacy.ErrBrandMismatch) {
 		t.Fatalf("expected ErrBrandMismatch for unknown brand, got %v", err)
@@ -389,5 +409,67 @@ func TestDispenseAdditionalBranchesPG16(t *testing.T) {
 	}
 	if _, err := pharmSvc.Dispense(ctx, pharmacist, signDispenseReq(t, raw3, pharmacist.IIN, brandID, 1)); !errors.Is(err, pharmacy.ErrItemAlreadyDispensed) {
 		t.Fatalf("expected ErrItemAlreadyDispensed, got %v", err)
+	}
+}
+
+func TestDispenseWithRealJWTMiddlewarePG16(t *testing.T) {
+	pool := testutil.SetupSeededDB(t)
+	ctx := context.Background()
+
+	_, itemID, brandID := setupActivePrescriptionItem(t, pool, 6)
+	pharmacist := auth.ActorContext{
+		UserID: seed.PharmacistUserID,
+		IIN:    "920721402851",
+		Role:   auth.RolePharmacist,
+	}
+
+	qrRepo := qr.NewPGRepository(pool)
+	qrSvc := qr.NewService(qrRepo, 60*time.Second, 90*time.Second)
+	verifier, err := pki.NewMockVerifier("development", true, "dispense-test-secret")
+	if err != nil {
+		t.Fatalf("NewMockVerifier: %v", err)
+	}
+	pharmSvc := pharmacy.NewService(pool, qrRepo, pki.NewPGRepository(), verifier, audit.NewPGLogger(), nil)
+	h := pharmacy.NewHandler(pharmSvc, nil)
+
+	const jwtSecret = "integration-test-jwt-secret-32-chars"
+	router := httpserver.NewRouter(httpserver.RouterDeps{
+		AuthMiddleware: auth.JWTMiddleware(jwtSecret),
+		RegisterRoutes: h.RegisterRoutes,
+	})
+	srv := httptest.NewServer(router)
+	defer srv.Close()
+
+	issued, err := qrSvc.IssueToken(ctx, itemID, seed.PatientUserID)
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	// Unauthenticated request -> 401
+	body, _ := json.Marshal(signDispenseReq(t, issued.Token, pharmacist.IIN, brandID, 6))
+	resp401, err := http.Post(srv.URL+"/api/v1/dispensing", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST without JWT: %v", err)
+	}
+	_ = resp401.Body.Close()
+	if resp401.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without JWT, got %d", resp401.StatusCode)
+	}
+
+	// Valid pharmacist JWT -> 200 OK
+	token, err := auth.SignAccessToken(jwtSecret, pharmacist, 15*time.Minute)
+	if err != nil {
+		t.Fatalf("SignAccessToken: %v", err)
+	}
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/v1/dispensing", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp200, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST with JWT: %v", err)
+	}
+	_ = resp200.Body.Close()
+	if resp200.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 with pharmacist JWT, got %d", resp200.StatusCode)
 	}
 }

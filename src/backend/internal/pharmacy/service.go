@@ -101,7 +101,8 @@ func NewService(
 }
 
 // Dispense atomically validates the single-use QR token, locks the prescription item,
-// verifies the pharmacist's EDS signature, records dispensing_events, and updates statuses.
+// verifies the pharmacist's EDS signature (before taking row locks), records dispensing_events,
+// and updates statuses.
 func (s *Service) Dispense(ctx context.Context, actor auth.ActorContext, req DispenseRequest) (*DispenseResult, error) {
 	if strings.TrimSpace(req.QRToken) == "" || req.MedicineBrandID == uuid.Nil || req.Quantity <= 0 {
 		return nil, ErrInvalidDispenseRequest
@@ -109,29 +110,44 @@ func (s *Service) Dispense(ctx context.Context, actor auth.ActorContext, req Dis
 	if s.verifier != nil && strings.TrimSpace(req.CMSSignature) == "" {
 		return nil, ErrInvalidDispenseRequest
 	}
-	if actor.Role != auth.RolePharmacist {
+	if actor.Role != auth.RolePharmacist || strings.TrimSpace(actor.IIN) == "" {
 		return nil, ErrForbiddenPharmacist
+	}
+
+	// Pre-lock verification: check pharmacist profile and execute external NCANode HTTP
+	// signature check BEFORE opening the transaction or acquiring FOR UPDATE row locks.
+	var (
+		pharmacyID         uuid.UUID
+		pharmacistVerified bool
+	)
+	if err := s.pool.QueryRow(ctx, `
+		SELECT pharmacy_id, is_verified
+		FROM pharmacist_profiles
+		WHERE user_id = $1
+	`, actor.UserID).Scan(&pharmacyID, &pharmacistVerified); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrForbiddenPharmacist
+		}
+		return nil, fmt.Errorf("lookup pharmacist profile: %w", err)
+	}
+	if !pharmacistVerified {
+		return nil, ErrForbiddenPharmacist
+	}
+
+	var verifiedSig *pki.VerificationResult
+	if s.verifier != nil {
+		canonicalBytes, err := BuildDispensingCanonical(req.QRToken, actor.IIN, req.MedicineBrandID, req.Quantity)
+		if err != nil {
+			return nil, err
+		}
+		verifiedSig, err = s.verifier.VerifyCMS(ctx, req.CMSSignature, canonicalBytes, actor.IIN)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var result *DispenseResult
 	err := database.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
-		var pharmacyID uuid.UUID
-		var pharmacistVerified bool
-		err := tx.QueryRow(ctx, `
-			SELECT pharmacy_id, is_verified
-			FROM pharmacist_profiles
-			WHERE user_id = $1
-		`, actor.UserID).Scan(&pharmacyID, &pharmacistVerified)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrForbiddenPharmacist
-			}
-			return fmt.Errorf("lookup pharmacist profile: %w", err)
-		}
-		if !pharmacistVerified {
-			return ErrForbiddenPharmacist
-		}
-
 		// Layer 1: Single-use QR token row lock (FOR UPDATE).
 		tok, err := s.qrRepo.FindAndLockForRedemption(ctx, tx, req.QRToken)
 		if err != nil {
@@ -201,28 +217,22 @@ func (s *Service) Dispense(ctx context.Context, actor auth.ActorContext, req Dis
 			return ErrBrandMismatch
 		}
 
-		// Verify pharmacist EDS signature and persist in signatures.
+		// Generate dispensing event ID once so signatures.entity_id, dispensing_events.id,
+		// and audit_logs.entity_id always reference the exact same record.
+		eventID := uuid.New()
+
 		var sigID uuid.UUID
-		if s.verifier != nil {
-			canonicalBytes, err := BuildDispensingCanonical(req.QRToken, actor.IIN, req.MedicineBrandID, req.Quantity)
-			if err != nil {
-				return err
-			}
-			verified, err := s.verifier.VerifyCMS(ctx, req.CMSSignature, canonicalBytes, actor.IIN)
-			if err != nil {
-				return err
-			}
-			eventID := uuid.New()
+		if verifiedSig != nil {
 			sigID, err = s.sigRepo.SaveTx(ctx, tx, pki.SignatureRecord{
 				EntityType:         pki.EntityDispensing,
 				EntityID:           eventID,
 				SignerUserID:       actor.UserID,
-				SignerIIN:          verified.SignerIIN,
-				CertSerialNumber:   verified.CertSerialNumber,
-				RawSignature:       verified.RawSignature,
-				SignatureHash:      verified.SignedDataHash,
+				SignerIIN:          verifiedSig.SignerIIN,
+				CertSerialNumber:   verifiedSig.CertSerialNumber,
+				RawSignature:       verifiedSig.RawSignature,
+				SignatureHash:      verifiedSig.SignedDataHash,
 				SignedAt:           now,
-				OCSPStatus:         verified.OCSPStatus,
+				OCSPStatus:         verifiedSig.OCSPStatus,
 				VerificationStatus: "verified",
 			})
 			if err != nil {
@@ -254,14 +264,13 @@ func (s *Service) Dispense(ctx context.Context, actor auth.ActorContext, req Dis
 		if sigID != uuid.Nil {
 			sigPtr = &sigID
 		}
-		var eventID uuid.UUID
-		if err := tx.QueryRow(ctx, `
+		if _, err := tx.Exec(ctx, `
 			INSERT INTO dispensing_events (
-				prescription_item_id, pharmacist_id, pharmacy_id, medicine_brand_id,
+				id, prescription_item_id, pharmacist_id, pharmacy_id, medicine_brand_id,
 				quantity_dispensed, dispensed_at, notes, signature_id
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			RETURNING id
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		`,
+			eventID,
 			tok.PrescriptionItemID,
 			actor.UserID,
 			pharmacyID,
@@ -270,7 +279,7 @@ func (s *Service) Dispense(ctx context.Context, actor auth.ActorContext, req Dis
 			now,
 			nullIfEmpty(req.Notes),
 			sigPtr,
-		).Scan(&eventID); err != nil {
+		); err != nil {
 			return fmt.Errorf("insert dispensing event: %w", err)
 		}
 

@@ -89,4 +89,43 @@ func TestQRIssueAndLockRedemptionPG16(t *testing.T) {
 	if !errors.Is(err, qr.ErrTokenExpired) {
 		t.Fatalf("expected ErrTokenExpired, got %v", err)
 	}
+
+	// Issuing a new token must invalidate earlier unconsumed tokens for the same item.
+	rotatedFirst, err := svc.IssueToken(ctx, itemID, seed.PatientUserID)
+	if err != nil {
+		t.Fatalf("IssueToken rotated #1: %v", err)
+	}
+	rotatedSecond, err := svc.IssueToken(ctx, itemID, seed.PatientUserID)
+	if err != nil {
+		t.Fatalf("IssueToken rotated #2: %v", err)
+	}
+	err = database.WithTx(ctx, pool, func(tx pgx.Tx) error {
+		_, err := repo.FindAndLockForRedemption(ctx, tx, rotatedFirst.Token)
+		return err
+	})
+	if !errors.Is(err, qr.ErrTokenExpired) {
+		t.Fatalf("expected earlier unconsumed QR token to be expired after rotation, got %v", err)
+	}
+	err = database.WithTx(ctx, pool, func(tx pgx.Tx) error {
+		locked, err := repo.FindAndLockForRedemption(ctx, tx, rotatedSecond.Token)
+		if err != nil {
+			return err
+		}
+		return repo.MarkConsumedTx(ctx, tx, locked.ID, seed.PharmacistUserID)
+	})
+	if err != nil {
+		t.Fatalf("expected latest rotated QR token to succeed, got %v", err)
+	}
+
+	// Non-existent item ID and unknown raw token return typed errors.
+	if _, err := svc.IssueToken(ctx, uuid.New(), seed.PatientUserID); !errors.Is(err, qr.ErrPrescriptionItemNotFound) {
+		t.Fatalf("expected ErrPrescriptionItemNotFound, got %v", err)
+	}
+	err = database.WithTx(ctx, pool, func(tx pgx.Tx) error {
+		_, err := repo.FindAndLockForRedemption(ctx, tx, "erx_unknown_token")
+		return err
+	})
+	if !errors.Is(err, qr.ErrTokenNotFound) {
+		t.Fatalf("expected ErrTokenNotFound, got %v", err)
+	}
 }
