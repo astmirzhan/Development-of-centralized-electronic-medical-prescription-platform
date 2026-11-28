@@ -21,6 +21,7 @@ type RouterDeps struct {
 	Logger             *slog.Logger
 	DB                 DBPinger
 	CORSAllowedOrigins []string
+	AuthMiddleware     func(http.Handler) http.Handler
 	RegisterRoutes     func(r chi.Router)
 }
 
@@ -37,7 +38,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/health", healthHandler(deps.DB))
 
 	if deps.RegisterRoutes != nil {
-		r.Route("/api/v1", deps.RegisterRoutes)
+		r.Route("/api/v1", func(api chi.Router) {
+			if deps.AuthMiddleware != nil {
+				api.Use(deps.AuthMiddleware)
+			}
+			deps.RegisterRoutes(api)
+		})
 	}
 
 	return r
@@ -99,18 +105,32 @@ func slogMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 }
 
 func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	wildcard := slices.Contains(allowedOrigins, "*")
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin != "" && (slices.Contains(allowedOrigins, "*") || slices.Contains(allowedOrigins, origin)) {
+			allowed := false
+
+			if wildcard {
+				// Wildcard origin must never be combined with Allow-Credentials.
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Request-ID")
+				allowed = true
+			} else if origin != "" && slices.Contains(allowedOrigins, origin) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Vary", "Origin")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Request-ID")
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				allowed = true
 			}
 
 			if r.Method == http.MethodOptions {
+				if !allowed {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

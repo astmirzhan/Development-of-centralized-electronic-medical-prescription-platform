@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/xjam-byte/erx-platform/backend/internal/auth"
 	"github.com/xjam-byte/erx-platform/backend/internal/config"
 	"github.com/xjam-byte/erx-platform/backend/internal/database"
 	"github.com/xjam-byte/erx-platform/backend/internal/httpserver"
@@ -49,6 +50,7 @@ func main() {
 		Logger:             logger,
 		DB:                 poolPinger{pool: pool},
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
+		AuthMiddleware:     auth.JWTMiddleware(cfg.JWTSigningKey),
 	})
 
 	srv := &http.Server{

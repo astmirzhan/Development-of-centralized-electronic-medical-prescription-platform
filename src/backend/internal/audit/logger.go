@@ -56,8 +56,8 @@ func (l *PGLogger) AppendTx(ctx context.Context, tx pgx.Tx, entry Entry) error {
 		}
 	}
 
-	createdAt := time.Now().UTC()
-	recordHash := computeRecordHash(prevHash, entry, payloadBytes, createdAt)
+	createdAt := time.Now().UTC().Truncate(time.Microsecond)
+	recordHash := ComputeRecordHash(prevHash, entry, payloadBytes, createdAt)
 
 	var prevPtr *string
 	if prevHash != "" {
@@ -87,7 +87,9 @@ func (l *PGLogger) AppendTx(ctx context.Context, tx pgx.Tx, entry Entry) error {
 	return nil
 }
 
-func computeRecordHash(prevHash string, entry Entry, payload []byte, createdAt time.Time) string {
+// ComputeRecordHash deterministically hashes an audit entry chained to prevHash.
+// Timestamps are normalized to UTC microsecond precision to match PostgreSQL TIMESTAMPTZ storage.
+func ComputeRecordHash(prevHash string, entry Entry, payload []byte, createdAt time.Time) string {
 	h := sha256.New()
 	h.Write([]byte(prevHash))
 	h.Write([]byte("|"))
@@ -105,7 +107,7 @@ func computeRecordHash(prevHash string, entry Entry, payload []byte, createdAt t
 	h.Write([]byte("|"))
 	h.Write(payload)
 	h.Write([]byte("|"))
-	h.Write([]byte(createdAt.UTC().Format(time.RFC3339Nano)))
+	h.Write([]byte(createdAt.UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)))
 	return hex.EncodeToString(h.Sum(nil))
 }
 

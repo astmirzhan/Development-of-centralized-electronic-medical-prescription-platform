@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ type Config struct {
 // Load reads configuration from environment variables, applying sensible local
 // development defaults and validating required settings.
 func Load() (*Config, error) {
-	appEnv := getEnv("APP_ENV", "development")
+	appEnv := strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", "development")))
 
 	apiPort, err := getEnvInt("API_PORT", 8080)
 	if err != nil {
@@ -73,7 +74,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	ncaTestMode, err := getEnvBool("NCA_TEST_MODE", appEnv != "production")
+	ncaTestMode, err := getEnvBool("NCA_TEST_MODE", isTestAllowedEnv(appEnv))
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +108,10 @@ func Load() (*Config, error) {
 
 // Validate enforces mandatory configuration invariants.
 func (c *Config) Validate() error {
+	c.AppEnv = strings.ToLower(strings.TrimSpace(c.AppEnv))
+	if c.AppEnv == "" {
+		return fmt.Errorf("APP_ENV must not be empty")
+	}
 	if c.APIPort <= 0 || c.APIPort > 65535 {
 		return fmt.Errorf("invalid API_PORT: %d", c.APIPort)
 	}
@@ -128,6 +133,9 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.JWTSigningKey) == "" {
 		return fmt.Errorf("JWT_SIGNING_KEY must not be empty")
 	}
+	if c.NCATestMode && !isTestAllowedEnv(c.AppEnv) {
+		return fmt.Errorf("NCA_TEST_MODE is only permitted when APP_ENV is development or test (got %q)", c.AppEnv)
+	}
 	if c.AppEnv == "production" {
 		if c.PostgresPassword == "change-me" {
 			return fmt.Errorf("POSTGRES_PASSWORD must be changed in production")
@@ -135,8 +143,8 @@ func (c *Config) Validate() error {
 		if c.JWTSigningKey == "change-me-to-a-long-random-string" || len(c.JWTSigningKey) < 32 {
 			return fmt.Errorf("JWT_SIGNING_KEY must be at least 32 characters and non-default in production")
 		}
-		if c.NCATestMode {
-			return fmt.Errorf("NCA_TEST_MODE must be false in production")
+		if slices.Contains(c.CORSAllowedOrigins, "*") {
+			return fmt.Errorf("CORS_ALLOWED_ORIGINS must not contain wildcard '*' in production")
 		}
 	}
 	if c.QRTokenRotation <= 0 || c.QRTokenAcceptWindow <= 0 {
@@ -146,6 +154,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("QR_TOKEN_ACCEPT_WINDOW (%s) must be >= QR_TOKEN_ROTATION (%s)", c.QRTokenAcceptWindow, c.QRTokenRotation)
 	}
 	return nil
+}
+
+func isTestAllowedEnv(appEnv string) bool {
+	return appEnv == "development" || appEnv == "test"
 }
 
 // DatabaseURL constructs a PostgreSQL connection URI for pgxpool.
