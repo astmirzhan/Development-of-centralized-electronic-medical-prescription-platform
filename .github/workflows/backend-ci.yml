@@ -1,0 +1,77 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+    paths:
+      - "src/backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  backend-test:
+    name: Go 1.23 Vet, Race Tests & Coverage
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.23
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: src/backend/go.sum
+
+      - name: Check formatting (gofmt)
+        run: |
+          unformatted=$(gofmt -l src/backend)
+          if [ -n "$unformatted" ]; then
+            echo "Unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Run go vet
+        working-directory: src/backend
+        run: go vet ./...
+
+      - name: Run unit & PostgreSQL integration tests with race detector
+        working-directory: src/backend
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          CI: "true"
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Print coverage summary and enforce 80% threshold on core packages
+        working-directory: src/backend
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+        run: |
+          go tool cover -func=coverage.out | grep -E "internal/(cds|pharmacy|pki|qr)|total:"
+          for pkg in ./internal/cds ./internal/pharmacy ./internal/pki ./internal/qr; do
+            cov=$(go test -cover "$pkg" | awk '/coverage:/ {gsub("%","",$5); print $5}')
+            echo "$pkg coverage: ${cov}%"
+            awk -v c="$cov" 'BEGIN { if (c+0 < 80.0) { exit 1 } }'
+          done

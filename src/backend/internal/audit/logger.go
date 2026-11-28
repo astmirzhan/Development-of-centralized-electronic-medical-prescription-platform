@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -105,10 +106,30 @@ func ComputeRecordHash(prevHash string, entry Entry, payload []byte, createdAt t
 		h.Write([]byte(entry.EntityID.String()))
 	}
 	h.Write([]byte("|"))
-	h.Write(payload)
+	h.Write(canonicalizePayload(payload))
 	h.Write([]byte("|"))
 	h.Write([]byte(createdAt.UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// canonicalizePayload normalizes JSON bytes (e.g., PostgreSQL JSONB pretty-spacing) into compact
+// deterministic JSON so hashes match across Go marshaling and PostgreSQL round-trips.
+func canonicalizePayload(payload []byte) []byte {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(trimmed))
+	dec.UseNumber()
+	var parsed any
+	if err := dec.Decode(&parsed); err != nil {
+		return trimmed
+	}
+	compact, err := json.Marshal(parsed)
+	if err != nil {
+		return trimmed
+	}
+	return compact
 }
 
 func nullIfEmpty(s string) *string {

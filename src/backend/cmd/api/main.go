@@ -19,6 +19,7 @@ import (
 	"github.com/xjam-byte/erx-platform/backend/internal/config"
 	"github.com/xjam-byte/erx-platform/backend/internal/database"
 	"github.com/xjam-byte/erx-platform/backend/internal/httpserver"
+	"github.com/xjam-byte/erx-platform/backend/internal/pharmacy"
 	"github.com/xjam-byte/erx-platform/backend/internal/pki"
 	"github.com/xjam-byte/erx-platform/backend/internal/prescriptions"
 	"github.com/xjam-byte/erx-platform/backend/internal/qr"
@@ -79,6 +80,9 @@ func main() {
 	qrService := qr.NewService(qrRepo, cfg.QRTokenRotation, cfg.QRTokenAcceptWindow)
 	qrHandler := qr.NewHandler(qrService, logger)
 
+	pharmacyService := pharmacy.NewService(pool, qrRepo, sigRepo, pkiVerifier, auditLogger, logger)
+	pharmacyHandler := pharmacy.NewHandler(pharmacyService, logger)
+
 	handler := httpserver.NewRouter(httpserver.RouterDeps{
 		Logger:             logger,
 		DB:                 poolPinger{pool: pool},
@@ -88,6 +92,7 @@ func main() {
 			cdsHandler.RegisterRoutes(r)
 			rxHandler.RegisterRoutes(r)
 			qrHandler.RegisterRoutes(r)
+			pharmacyHandler.RegisterRoutes(r)
 		},
 	})
 
