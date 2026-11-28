@@ -11,8 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xjam-byte/erx-platform/backend/internal/auth"
+	"github.com/xjam-byte/erx-platform/backend/internal/cds"
 	"github.com/xjam-byte/erx-platform/backend/internal/config"
 	"github.com/xjam-byte/erx-platform/backend/internal/database"
 	"github.com/xjam-byte/erx-platform/backend/internal/httpserver"
@@ -46,11 +48,18 @@ func main() {
 	}
 	defer pool.Close()
 
+	cdsRepo := cds.NewPGRepository(pool)
+	cdsService := cds.NewService(cdsRepo, logger)
+	cdsHandler := cds.NewHandlerWithVerifier(cdsService, cdsRepo, logger)
+
 	handler := httpserver.NewRouter(httpserver.RouterDeps{
 		Logger:             logger,
 		DB:                 poolPinger{pool: pool},
 		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
 		AuthMiddleware:     auth.JWTMiddleware(cfg.JWTSigningKey),
+		RegisterRoutes: func(r chi.Router) {
+			cdsHandler.RegisterRoutes(r)
+		},
 	})
 
 	srv := &http.Server{
