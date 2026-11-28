@@ -13,11 +13,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/xjam-byte/erx-platform/backend/internal/audit"
 	"github.com/xjam-byte/erx-platform/backend/internal/auth"
 	"github.com/xjam-byte/erx-platform/backend/internal/cds"
 	"github.com/xjam-byte/erx-platform/backend/internal/config"
 	"github.com/xjam-byte/erx-platform/backend/internal/database"
 	"github.com/xjam-byte/erx-platform/backend/internal/httpserver"
+	"github.com/xjam-byte/erx-platform/backend/internal/pki"
+	"github.com/xjam-byte/erx-platform/backend/internal/prescriptions"
+	"github.com/xjam-byte/erx-platform/backend/internal/qr"
 )
 
 type poolPinger struct {
@@ -48,9 +52,32 @@ func main() {
 	}
 	defer pool.Close()
 
+	auditLogger := audit.NewPGLogger()
+
+	var pkiVerifier pki.Verifier
+	if cfg.NCATestMode {
+		mockVerifier, err := pki.NewMockVerifier(cfg.AppEnv, cfg.NCATestMode, cfg.JWTSigningKey)
+		if err != nil {
+			logger.Error("failed to initialize mock PKI verifier", "error", err)
+			os.Exit(1)
+		}
+		pkiVerifier = mockVerifier
+	} else {
+		pkiVerifier = pki.NewNCANodeVerifier(cfg.NCANodeURL, nil)
+	}
+
 	cdsRepo := cds.NewPGRepository(pool)
 	cdsService := cds.NewService(cdsRepo, logger)
 	cdsHandler := cds.NewHandlerWithVerifier(cdsService, cdsRepo, logger)
+
+	rxRepo := prescriptions.NewPGRepository(pool)
+	sigRepo := pki.NewPGRepository()
+	rxService := prescriptions.NewService(rxRepo, rxRepo, sigRepo, pkiVerifier, auditLogger, logger)
+	rxHandler := prescriptions.NewHandler(rxService, logger)
+
+	qrRepo := qr.NewPGRepository(pool)
+	qrService := qr.NewService(qrRepo, cfg.QRTokenRotation, cfg.QRTokenAcceptWindow)
+	qrHandler := qr.NewHandler(qrService, logger)
 
 	handler := httpserver.NewRouter(httpserver.RouterDeps{
 		Logger:             logger,
@@ -59,6 +86,8 @@ func main() {
 		AuthMiddleware:     auth.JWTMiddleware(cfg.JWTSigningKey),
 		RegisterRoutes: func(r chi.Router) {
 			cdsHandler.RegisterRoutes(r)
+			rxHandler.RegisterRoutes(r)
+			qrHandler.RegisterRoutes(r)
 		},
 	})
 
