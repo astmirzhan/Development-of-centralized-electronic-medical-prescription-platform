@@ -59,6 +59,7 @@ services:
       QR_TOKEN_ACCEPT_WINDOW: ${QR_TOKEN_ACCEPT_WINDOW:-90s}
       NCANODE_URL: ${NCANODE_URL:-http://ncanode:14579}
       NCA_TEST_MODE: ${NCA_TEST_MODE:-true}
+      NCA_MOCK_SECRET: ${NCA_MOCK_SECRET:-local-docker-dev-nca-mock-secret}
       SMS_PROVIDER: ${SMS_PROVIDER:-console}
       SMS_API_KEY: ${SMS_API_KEY:-placeholder}
     ports:

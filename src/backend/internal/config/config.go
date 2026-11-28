@@ -32,8 +32,9 @@ type Config struct {
 	QRTokenRotation     time.Duration
 	QRTokenAcceptWindow time.Duration
 
-	NCANodeURL  string
-	NCATestMode bool
+	NCANodeURL    string
+	NCATestMode   bool
+	NCAMockSecret string
 
 	SMSProvider string
 	SMSAPIKey   string
@@ -96,6 +97,7 @@ func Load() (*Config, error) {
 		QRTokenAcceptWindow: qrAcceptWindow,
 		NCANodeURL:          getEnv("NCANODE_URL", "http://localhost:14579"),
 		NCATestMode:         ncaTestMode,
+		NCAMockSecret:       strings.TrimSpace(os.Getenv("NCA_MOCK_SECRET")),
 		SMSProvider:         getEnv("SMS_PROVIDER", "console"),
 		SMSAPIKey:           getEnv("SMS_API_KEY", "placeholder"),
 	}
@@ -135,6 +137,9 @@ func (c *Config) Validate() error {
 	}
 	if c.NCATestMode && !isTestAllowedEnv(c.AppEnv) {
 		return fmt.Errorf("NCA_TEST_MODE is only permitted when APP_ENV is development or test (got %q)", c.AppEnv)
+	}
+	if c.NCATestMode && strings.TrimSpace(c.NCAMockSecret) == "" {
+		return fmt.Errorf("NCA_MOCK_SECRET must be set when NCA_TEST_MODE=true")
 	}
 	if c.AppEnv == "production" {
 		if c.PostgresPassword == "change-me" {

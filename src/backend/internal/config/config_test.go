@@ -6,6 +6,7 @@ import (
 )
 
 func TestLoadDefaults(t *testing.T) {
+	t.Setenv("NCA_MOCK_SECRET", "dev-test-mock-secret")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() unexpected error: %v", err)
@@ -65,5 +66,12 @@ func TestValidateProductionGuards(t *testing.T) {
 	}
 	if cfg.NCATestMode {
 		t.Fatal("expected NCATestMode=false in production")
+	}
+
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("NCA_TEST_MODE", "true")
+	t.Setenv("NCA_MOCK_SECRET", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected error when NCA_TEST_MODE=true without NCA_MOCK_SECRET")
 	}
 }
